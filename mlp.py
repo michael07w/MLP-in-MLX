@@ -76,12 +76,10 @@ def sample(num_samples, params):
             h = mx.tanh(emb_vals @ params['W1'] + params['b1'])
             logits = h @ params['W2'] + params['b2']
             probs = mx.softmax(logits)
-            np_probs = np.array(probs)
 
-            # TODO: The following function casts the values to float64 before
-            # sampling, resulting in values whose sum > 1. In this situation,
-            # the function throws an error and the sampling fails. So, this 
-            # must be fixed!
+            # Next two lines ensure that the array sum == 1 after conversion
+            np_probs = np.array(probs).astype(np.float64)
+            np_probs = np_probs / np.sum(np_probs)
             ixList = np.random.multinomial(1, np_probs)
             ix = np.where(ixList == 1)[0].item()
             context = context[1:] + [ix]
