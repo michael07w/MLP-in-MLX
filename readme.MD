@@ -4,4 +4,4 @@ This is largely modeled after Karpathy's makemore model. Specifically, the MLP v
 
 I've eliminated all uses of PyTorch and ported the model to MLX.
 
-I am still working on the Python file, so I'd recommend viewing/running the notebook to experiment with the model.
+The notebook serves as a breakdown of the functions/steps, and the Python file simply completes all steps (e.g. embedding, training, evaluating, and sampling) and prints the results.
