@@ -32,7 +32,6 @@ def embed_chars(words):
         for c in word:
             chars.add(c)
 
-    # Embed each character
     stoi = {ch:i+1 for i, ch in enumerate(sorted(chars))}
     stoi['.'] = 0
     itos = {i:s for s, i in stoi.items()}
@@ -62,10 +61,6 @@ def loss_fn(params, ix):
     return nn.losses.cross_entropy(logits, Ytr[ix], reduction='mean')
 
 
-# Function to perform forward pass, calculating loss and gradient
-loss_and_grad_fn = mx.value_and_grad(loss_fn)
-
-
 # Sample from the model
 def sample(num_samples, params):
     for _ in range(num_samples):
@@ -90,54 +85,60 @@ def sample(num_samples, params):
         print(''.join(itos[i] for i in out))
 
 
-names = load_dataset('names.txt')
-stoi, itos = embed_chars(names)
 
-# Training, Dev, and Test sets
-random.shuffle(names)
-n1 = int(0.8 * len(names))
-n2 = int(0.9 * len(names))
-Xtr, Ytr = split_dataset(names[:n1])
-Xdev, Ydev = split_dataset(names[n1:n2])
-Xtest, Ytest = split_dataset(names[n2:])
-print(f'Xtr.shape, Ytr.shape: [{Xtr.shape}, {Ytr.shape}]')
-print(f'Xdev.shape, Ydev.shape: [{Xdev.shape}, {Ydev.shape}]')
-print(f'Xtest.shape, Ytest.shape: [{Xtest.shape}, {Ytest.shape}]')
+if __name__ == '__main__':
 
-# Define the neural network hyperparameters
-C = mx.random.normal([len(itos), C_size])
-W1 = mx.random.normal([block_size * C_size, W1_size])
-b1 = mx.random.normal([W1_size])
-W2 = mx.random.normal([W1_size, len(itos)])
-b2 = mx.random.normal([len(itos)])
-trainable_params = {'C': C, 'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+    # Load dataset and embeddings
+    names = load_dataset('names.txt')
+    stoi, itos = embed_chars(names)
+
+    # Training, Dev, and Test sets
+    random.shuffle(names)
+    n1 = int(0.8 * len(names))
+    n2 = int(0.9 * len(names))
+    Xtr, Ytr = split_dataset(names[:n1])
+    Xdev, Ydev = split_dataset(names[n1:n2])
+    Xtest, Ytest = split_dataset(names[n2:])
+    print(f'Xtr.shape, Ytr.shape: [{Xtr.shape}, {Ytr.shape}]')
+    print(f'Xdev.shape, Ydev.shape: [{Xdev.shape}, {Ydev.shape}]')
+    print(f'Xtest.shape, Ytest.shape: [{Xtest.shape}, {Ytest.shape}]')
+
+    # Define the neural network hyperparameters
+    C = mx.random.normal([len(itos), C_size])
+    W1 = mx.random.normal([block_size * C_size, W1_size])
+    b1 = mx.random.normal([W1_size])
+    W2 = mx.random.normal([W1_size, len(itos)])
+    b2 = mx.random.normal([len(itos)])
+    trainable_params = {'C': C, 'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+
+    # Function to perform forward pass, calculating loss and gradient
+    loss_and_grad_fn = mx.value_and_grad(loss_fn)
+
+    # Training loop
+    for i in range(training_iters):
+
+        # Use a minibatch
+        ix = mx.random.randint(0, Xtr.shape[0], (32,))
+
+        # Forward pass, collecting loss and gradients
+        loss, grads = loss_and_grad_fn(trainable_params, ix)
+
+        # Update parameters
+        for k in trainable_params.keys():
+            trainable_params[k] += -0.01 * grads[k]
+
+        # Print training update
+        if (i + 1) % 1000 == 0: print(f'Loss at iteration {i + 1}:', loss.item())
+        # Print final loss
+        if i == training_iters - 1: print('Loss on last training iteration:', loss.item())
 
 
-# Training loop
-for i in range(training_iters):
+    # Evaluate loss on dev set
+    emb_vals = mx.flatten(C[Xdev], start_axis=1)
+    h = mx.tanh(emb_vals @ trainable_params['W1'] + trainable_params['b1'])
+    logits = h @ trainable_params['W2'] + trainable_params['b2']
+    dev_loss = nn.losses.cross_entropy(logits, Ydev, reduction='mean').item()
+    print('Dev Loss:', dev_loss)
 
-    # Use a minibatch
-    ix = mx.random.randint(0, Xtr.shape[0], (32,))
-
-    # Forward pass, collecting loss and gradients
-    loss, grads = loss_and_grad_fn(trainable_params, ix)
-
-    # Update parameters
-    for k in trainable_params.keys():
-        trainable_params[k] += -0.01 * grads[k]
-
-    # Print training update
-    if (i + 1) % 1000 == 0: print(f'Loss at iteration {i + 1}:', loss.item())
-    # Print final loss
-    if i == training_iters - 1: print('Loss on last training iteration:', loss.item())
-
-
-# Evaluate loss on dev set
-emb_vals = mx.flatten(C[Xdev], start_axis=1)
-h = mx.tanh(emb_vals @ trainable_params['W1'] + trainable_params['b1'])
-logits = h @ trainable_params['W2'] + trainable_params['b2']
-dev_loss = nn.losses.cross_entropy(logits, Ydev, reduction='mean').item()
-print('Dev Loss:', dev_loss)
-
-# Sample 20 names
-sample(20, trainable_params)
+    # Sample 20 names
+    sample(20, trainable_params)
